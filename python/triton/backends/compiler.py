@@ -275,3 +275,79 @@ class BaseBackend(metaclass=ABCMeta):
         Return the ascii key for a given argument with a given set of properties
         """
         return AttrsDescriptor.get_property_key(arg, align)
+
+
+@dataclass(frozen=True)
+class NPUTarget(object):
+    # Target backend, e.g., npu
+    backend: str
+    # Target architecture.
+    arch: Union[int, str]
+
+class NPUBaseBackend(metaclass=ABCMeta):
+
+    def __init__(self, target: NPUTarget) -> None:
+        self.target = target
+        assert self.supports_target(target)
+
+    @staticmethod
+    def _path_to_binary(binary: str):
+        # TODO:
+        raise RuntimeError(f"Cannot find {binary}")
+
+    @abstractclassmethod
+    def supports_target(target: NPUTarget):
+        raise NotImplementedError
+
+    @abstractmethod
+    def hash(self) -> str:
+        """Returns a unique identifier for this backend"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def parse_options(self, options: dict) -> object:
+        """
+        Converts an `options` dictionary into an arbitrary object and returns it.
+        This function may contain target-specific heuristics and check the legality of the provided options
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_stages(self, stages: dict, options: object) -> None:
+        """
+        Populates `stages` dictionary with entries of the form:
+        ir_name [str] => Function[(src: str, metadata: dict) -> str|bytes]
+        The value of each entry may populate a `metadata` dictionary.
+        Stages will be run sequentially (in inseriton order) and can communicate using `metadata`.
+        All stages are expected to return a `str` object, except for the last stage which returns
+        a `bytes` object for execution by the launcher.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_dialects(self, context):
+        """
+        Load additional MLIR dialects into the provided `context`
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_module_map(self) -> Dict[str, ModuleType]:
+        """
+        Return a map of interface modules to their device-specific implementations
+        """
+        raise NotImplementedError
+
+    def get_attrs_descriptor(self, params, args):
+        """
+        Return an attribute descriptor: given a set of parameters and arguments
+        the descriptor stores a set of compile time properties that can improve code
+        generation. Different backends might benefit from different properties
+        """
+        return AttrsDescriptor(params, args)
+
+    def compute_spec_key(self, arg, align):
+        """
+        Return the ascii key for a given argument with a given set of properties
+        """
+        return AttrsDescriptor.get_property_key(arg, align)

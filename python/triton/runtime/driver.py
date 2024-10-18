@@ -1,9 +1,19 @@
+import os
+
 from ..backends import backends
 from ..backends import DriverBase
 
 
 def _create_driver():
+    if os.getenv("TRITON_NPU_BACKEND", "0") == "1":
+        if "npu" not in backends:
+            raise RuntimeError("TRITON_NPU_BACKEND is set, but NPU backend is not available.")
+        return backends["npu"].driver()
+
     actives = [x.driver for x in backends.values() if x.driver.is_active()]
+    if len(actives) >= 2 and backends["npu"].driver.is_active():
+        print("Both NPU and GPU backends are available. Using the GPU backend.")
+        actives.remove(backends["npu"].driver)
     if len(actives) != 1:
         raise RuntimeError(f"{len(actives)} active drivers ({actives}). There should only be one.")
     return actives[0]()

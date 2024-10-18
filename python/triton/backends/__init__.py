@@ -2,8 +2,8 @@ import os
 import importlib.util
 import inspect
 from dataclasses import dataclass
-from .driver import DriverBase
-from .compiler import BaseBackend
+from .driver import DriverBase, NPUDriverBase
+from .compiler import BaseBackend, NPUBaseBackend
 
 
 def _load_module(name, path):
@@ -42,7 +42,12 @@ def _discover_backends():
             continue
         compiler = _load_module(name, os.path.join(root, name, 'compiler.py'))
         driver = _load_module(name, os.path.join(root, name, 'driver.py'))
-        backends[name] = Backend(_find_concrete_subclasses(compiler, BaseBackend),
+
+        if name == "npu":
+            backends[name] = Backend(_find_concrete_subclasses(compiler, NPUBaseBackend),
+                                 _find_concrete_subclasses(driver, NPUDriverBase))
+        else:
+            backends[name] = Backend(_find_concrete_subclasses(compiler, BaseBackend),
                                  _find_concrete_subclasses(driver, DriverBase))
     return backends
 

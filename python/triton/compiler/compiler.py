@@ -3,7 +3,7 @@ import hashlib
 import json
 from .._C.libtriton import get_cache_invalidating_env_vars, ir
 from ..backends import backends
-from ..backends.compiler import GPUTarget, AttrsDescriptor
+from ..backends.compiler import GPUTarget, NPUTarget, AttrsDescriptor
 from .. import __version__
 from ..runtime.autotuner import OutOfResources
 from ..runtime.cache import get_cache_manager, get_dump_manager, get_override_manager
@@ -217,7 +217,7 @@ def filter_traceback(e: BaseException):
 def compile(src, target=None, options=None):
     if target is None:
         target = driver.active.get_current_target()
-    assert isinstance(target, GPUTarget), "target must be of GPUTarget type"
+    assert isinstance(target, GPUTarget) | isinstance(target, NPUTarget), "target must be of GPUTarget or NPUTarget type"
     backend = make_backend(target)
     ir_source = not isinstance(src, ASTSource)
     # create backend
@@ -352,9 +352,12 @@ class CompiledKernel:
         metadata_path = next((Path(p) for c, p in metadata_group.items() if c.endswith(".json")))
         metadata = json.loads(metadata_path.read_text())
         metadata['cluster_dims'] = tuple(metadata['cluster_dims'])
-        # JSON serialization dumps the target as a dict. Restore it to a GPUTarget.
+        # JSON serialization dumps the target as a dict. Restore it to a GPUTarget or NPUTarget.
         target = metadata['target']
-        metadata['target'] = GPUTarget(target['backend'], target['arch'], target['warp_size'])
+        if target['backend'] == "npu":
+            metadata['target'] = NPUTarget(target['backend'], target['arch'])
+        else:
+            metadata['target'] = GPUTarget(target['backend'], target['arch'], target['warp_size'])
         KernelMetadata = namedtuple('KernelMetadata', sorted(list(metadata.keys())))
         self.metadata = KernelMetadata(**metadata)
         backend = make_backend(self.metadata.target)

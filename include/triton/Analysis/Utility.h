@@ -5,6 +5,7 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Support/LLVM.h"
 #include "triton/Dialect/Triton/IR/Dialect.h"
+#include "triton/Dialect/TritonNPU/IR/Dialect.h"
 #include "triton/Dialect/TritonGPU/IR/Dialect.h"
 
 namespace mlir {
