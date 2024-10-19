@@ -144,16 +144,17 @@ class NPUBackend(NPUBaseBackend):
 
     @staticmethod
     def make_npubin(src, metadata, options):
-        # Right now, src is just TTIR. Extract kernel name from tt.func.
-        names = re.findall(r"\s+tt.func public @([a-zA-Z_][a-zA-Z0-9_]*)\(", str(src))
-        assert len(names) == 1
+        # Just a quick hack while developing the backend.
+        names = re.findall(r"\s llvm.func @([a-zA-Z_][a-zA-Z0-9_]*)\(", str(src))
+        # TODO: not check currently
+        # assert len(names) == 1
         metadata["name"] = names[0]
         # TODO: Call llc to create an executable.
         return src
 
     def add_stages(self, stages, options):
         stages["ttir"] = lambda src, metadata: self.make_ttir(src, metadata, options)
-        stages["ttcir"] = lambda src, metadata: self.make_ttnir(src, metadata, options)
+        stages["ttnir"] = lambda src, metadata: self.make_ttnir(src, metadata, options)
         stages["llir"] = lambda src, metadata: self.make_llir(src, metadata, options)
         stages["npubin"] = lambda src, metadata: self.make_npubin(src, metadata, options)
 

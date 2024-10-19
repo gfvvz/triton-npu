@@ -1,3 +1,19 @@
+# Triton-NPU
+
+An experimental NPU backend for [Triton](https://github.com/openai/triton).
+
+# How to use it?
+
+Build it like a normal Triton, but just pass TRITON_NPU_BACKEND=1 to use the NPU backend over a GPU backend, if any.
+
+```
+TRITON_NPU_BACKEND=1 python3 python/test/triton_npu/01-test_basic_transform.py
+```
+
+---
+
+# Upstream README
+
 <div align="center">
   <img src="https://lh5.googleusercontent.com/wzQKEsTFkrgNQO9JjhGH5wFvslJr1saLtLaJ_a6Fp_gNENpvt3VG7BmztwngU9hFJaU4CPwGiw1opQtDvTkLrxWRbO_a12Q-pdESWHgtmheIHcPbOL5ZMC4TSiJVe5ty1w=w3517" alt="Triton logo">
 </div>

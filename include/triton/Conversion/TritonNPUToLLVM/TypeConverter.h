@@ -15,6 +15,8 @@ public:
 
   TritonNPUToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOptions &option,
                                const DataLayoutAnalysis *analysis = nullptr);
+
+  Type convertTritonPointerType(triton::PointerType type);
 };
 
 #endif
