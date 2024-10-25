@@ -4,7 +4,7 @@ import os
 import re
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 from types import ModuleType
 
 from triton._C.libtriton import npu, ir, llvm, passes
@@ -21,6 +21,8 @@ class NPUOptions:
     extern_libs: dict = None
     debug: bool = False
     sanitize_overflow: bool = True
+    allowed_dot_input_precisions: Tuple[str] = ("ieee",)
+    allow_fp8e4nv: bool = False
 
     # TODO: We may introduce NPU-specific options.
     def __post_init__(self):
@@ -68,7 +70,6 @@ class NPUBackend(NPUBaseBackend):
         pm = ir.pass_manager(mod.context)
         pm.enable_debug()
         passes.common.add_inliner(pm)
-        passes.ttir.add_rewrite_tensor_pointer(pm)
         passes.ttir.add_combine(pm)
         passes.common.add_canonicalizer(pm)
         passes.ttir.add_reorder_broadcast(pm)
@@ -83,20 +84,27 @@ class NPUBackend(NPUBaseBackend):
         # TTIR -> TTNIR
         pm = ir.pass_manager(mod.context)
         pm.enable_debug()
-        passes.ttir.add_convert_to_ttnpuir(pm)
-
-        #
-        # TODO:
-        #
+        
+        npu.passes.ttnpuir.add_triton_to_triton_npu_pipeline(pm)
 
         passes.common.add_cse(pm)
         passes.common.add_symbol_dce(pm)
+        passes.common.add_canonicalizer(pm)
+
+        metadata["cluster_dims"] = (opt.cluster_dims[0], opt.cluster_dims[1], opt.cluster_dims[2])
+
         pm.run(mod)
 
         return mod
 
     @staticmethod
     def make_llir(src, metadata, options):
+        # warp-specialization mutates num_warps
+        num_warp_groups = src.get_int_attr("triton_gpu.num-warp-groups-per-cta")
+        if num_warp_groups is not None:
+            metadata["num_warps"] *= num_warp_groups
+        metadata["threads_per_warp"] = 1
+
         mod = src
         # TritonNPU -> LLVM-IR (MLIR)
         pm = ir.pass_manager(mod.context)
@@ -104,13 +112,14 @@ class NPUBackend(NPUBaseBackend):
         passes.convert.add_scf_to_cf(pm)
         passes.convert.add_index_to_llvmir(pm)
 
-        npu.passes.ttnpuir.add_to_llvmir(pm)
-        passes.common.add_canonicalizer(pm)
-        passes.common.add_cse(pm)
-
-        passes.convert.add_scf_to_cf(pm)
-        passes.convert.add_cf_to_llvmir(pm)
+        npu.passes.ttnpuir.add_triton_npu_to_llvmir_pipeline(pm)
+        passes.convert.add_math_to_llvmir(pm)
+        npu.passes.ttnpuir.add_math_to_libm(pm)
+        npu.passes.ttnpuir.add_vector_to_llvmir(pm)
+        npu.passes.ttnpuir.add_memref_to_llvmir(pm)
         passes.convert.add_arith_to_llvmir(pm)
+        npu.passes.ttnpuir.add_func_to_llvmir(pm)
+
         passes.common.add_canonicalizer(pm)
         passes.common.add_cse(pm)
         passes.common.add_symbol_dce(pm)
@@ -118,39 +127,43 @@ class NPUBackend(NPUBaseBackend):
             passes.llvmir.add_di_scope(pm)
         pm.run(mod)
 
+        # Find kernel fn
+        kernel_names = npu.find_kernel_names(mod)
+        assert len(kernel_names) == 1, f"expected exactly 1 kernel in a module, got {kernel_names}"
+
         # LLVM-IR (MLIR) -> LLVM-IR (LLVM)
         llvm.init_targets()
         context = llvm.context()
         llvm_mod = llvm.to_module(mod, context)
 
-         # TODO:
-        if not llvm_mod:
-            metadata["shared"] = 0
-            return src
-
-        if options.extern_libs:
-            paths = [path for (name, path) in options.extern_libs]
-            llvm.link_extern_libs(llvm_mod, paths)
+        llvm.set_host_target(llvm_mod)
+        #if options.extern_libs:
+        #    paths = [path for (name, path) in options.extern_libs]
+        #   llvm.link_extern_libs(llvm_mod, paths)
         llvm.optimize_module(llvm_mod, llvm.OPTIMIZE_O3)
 
-        # NPU doesn't have SMEM, but just to make it work for now.
+        # Get some metadata
         metadata["shared"] = 0
+        metadata["name"] = kernel_names[0]
 
-        # Cleanup
         ret = str(llvm_mod)
+
         del llvm_mod
         del context
         return ret
 
     @staticmethod
     def make_npubin(src, metadata, options):
-        # Just a quick hack while developing the backend.
-        names = re.findall(r"\s llvm.func @([a-zA-Z_][a-zA-Z0-9_]*)\(", str(src))
-        # TODO: not check currently
-        # assert len(names) == 1
-        metadata["name"] = names[0]
-        # TODO: Call llc to create an executable.
-        return src
+        if os.environ.get("TRITON_NPU_ASM_DUMP", "0") == "1":
+            print("********** Module ASM **********")
+            print(llvm.translate_to_host_asm(src))
+
+            from triton.runtime.cache import get_cache_manager
+            asm = llvm.translate_to_host_asm(src, options.enable_fp_fusion)
+            fn_cache_manager = get_cache_manager(metadata['hash'])
+            fn_cache_manager.put(asm, f"{metadata['name']}.asm")
+        ret = llvm.translate_to_npubin(src)
+        return ret
 
     def add_stages(self, stages, options):
         stages["ttir"] = lambda src, metadata: self.make_ttir(src, metadata, options)

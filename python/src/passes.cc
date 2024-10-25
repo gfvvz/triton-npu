@@ -6,7 +6,6 @@
 #include "triton/Analysis/Allocation.h"
 #include "triton/Analysis/Membar.h"
 #include "triton/Conversion/TritonGPUToLLVM/Passes.h"
-#include "triton/Conversion/TritonToTritonNPU/Passes.h"
 #include "triton/Conversion/TritonToTritonGPU/Passes.h"
 #include "triton/Dialect/Triton/Transforms/Passes.h"
 #include "triton/Dialect/TritonGPU/Transforms/Passes.h"
@@ -44,8 +43,6 @@ void init_triton_passes_ttir(py::module &&m) {
   ADD_PASS_WRAPPER_4("add_convert_to_ttgpuir",
                      createConvertTritonToTritonGPUPass, const std::string &,
                      int, int, int);
-  ADD_PASS_WRAPPER_0("add_convert_to_ttnpuir",
-                     createConvertTritonToTritonNPUPass);
 }
 
 void init_triton_passes_ttgpuir(py::module &&m) {
@@ -81,6 +78,7 @@ void init_triton_passes_convert(py::module &&m) {
   ADD_PASS_WRAPPER_0("add_cf_to_llvmir", createConvertControlFlowToLLVMPass);
   ADD_PASS_WRAPPER_0("add_index_to_llvmir", createConvertIndexToLLVMPass);
   ADD_PASS_WRAPPER_0("add_arith_to_llvmir", createArithToLLVMConversionPass);
+  ADD_PASS_WRAPPER_0("add_math_to_llvmir", createConvertMathToLLVMPass);
 }
 
 void init_triton_passes_llvmir(py::module &&m) {

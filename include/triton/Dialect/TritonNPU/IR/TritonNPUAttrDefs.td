@@ -17,9 +17,8 @@ class TritonNPU_Attr<string name, string attrMnemonic, list<Trait> traits = [],
                      string baseCppClass = "::mlir::Attribute">
   : AttrDef<dialect, name, !listconcat([TritonNPU_AttrTrait], traits), baseCppClass> {
 
-  let description = [{
-    WIP...
-  }];
+  let description = [{TritonNPU attr.}];
+  let attrName = "triton.npu." # attrMnemonic;
 }
 
 #endif

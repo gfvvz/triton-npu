@@ -1,4 +1,4 @@
-# TRITON_ENABLE_LLVM_DEBUG=1 TRITON_NPU_BACKEND=1 python3 python/test/triton_npu/01-test_basic_transform.py
+# TRITON_ENABLE_LLVM_DEBUG=1 TRITON_NPU_BACKEND=1 python3 python/test/triton_npu/01-test_empty_kernel.py
 
 import triton
 import triton.language as tl

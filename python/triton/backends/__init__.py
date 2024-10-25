@@ -45,7 +45,7 @@ def _discover_backends():
 
         if name == "npu":
             backends[name] = Backend(_find_concrete_subclasses(compiler, NPUBaseBackend),
-                                 _find_concrete_subclasses(driver, NPUDriverBase))
+                                 _find_concrete_subclasses(driver, DriverBase))
         else:
             backends[name] = Backend(_find_concrete_subclasses(compiler, BaseBackend),
                                  _find_concrete_subclasses(driver, DriverBase))
